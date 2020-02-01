@@ -27,11 +27,5 @@ task :run => :build do
 
     puts "Starting emulator..."
 
-    instance = Zemu.start(conf)
-
-    instance.continue
-
-    puts instance.serial_gets
-
-    instance.quit
+    Zemu.start_interactive(conf)
 end
