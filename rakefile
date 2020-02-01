@@ -1,5 +1,37 @@
+require 'zemu'
+
 desc "Build the application."
 task :build do
     system "vasmz80_oldstyle -Fbin zforth.asm -o zforth.bin"
     system "z80dasm -lt zforth.bin > zforth.diss"
+end
+
+task :run => :build do
+    conf = Zemu::Config.new do
+        name "zemu_zforth"
+
+        add_memory (Zemu::Config::ROM.new do
+            name "rom"
+            address 0x0000
+            size    0x8000
+            
+            contents from_binary("zforth.bin")
+        end)
+
+        add_io (Zemu::Config::SerialPort.new do
+            name "serial"
+            in_port 0x00
+            out_port 0x00
+        end)
+    end
+
+    puts "Starting emulator..."
+
+    instance = Zemu.start(conf)
+
+    instance.continue
+
+    puts instance.serial_gets
+
+    instance.quit
 end
