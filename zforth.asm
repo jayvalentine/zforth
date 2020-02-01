@@ -11,6 +11,10 @@ loop:
     inc     HL          ; Increment address and loop.
     djnz    loop
 done:
+    ld      A, $0d      ; Output CR/LF
+    out     (0), A
+    ld      A, $0a
+    out     (0), A
     halt                ; Done.
 
     org         $1000
