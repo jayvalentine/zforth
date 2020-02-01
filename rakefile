@@ -1,0 +1,5 @@
+desc "Build the application."
+task :build do
+    system "vasmz80_oldstyle -Fbin zforth.asm -o zforth.bin"
+    system "z80dasm -lt zforth.bin > zforth.diss"
+end
