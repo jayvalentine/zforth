@@ -3,3 +3,6 @@
 
 # Disassembled files.
 *.diss
+
+# Zemu output directory
+/bin
