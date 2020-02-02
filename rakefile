@@ -18,10 +18,17 @@ task :run => :build do
             contents from_binary("zforth.bin")
         end)
 
+        add_memory (Zemu::Config::RAM.new do
+            name "ram"
+            address 0x8000
+            size    0x7FFF
+        end)
+
         add_io (Zemu::Config::SerialPort.new do
             name "serial"
             in_port 0x00
             out_port 0x00
+            ready_port 0x01
         end)
     end
 
