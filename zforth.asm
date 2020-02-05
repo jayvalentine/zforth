@@ -14,6 +14,13 @@
 
 ; These macros are general-purpose.
 
+    macro NEWLINE
+    ld      A, $0d
+    out     (0), A
+    ld      A, $0a
+    out     (0), A
+    endmacro
+
 ; INC2.
 ; Increment twice the given 16-bit register pair.
     macro INC2, regpair
@@ -81,13 +88,70 @@ start:
     ld      SP, $FFFD
     ld      IX, $F000
 
-    ; Initialize the interpreter and go!
-    ld      DE, cold_start
-    NEXT
+loop:
+    ld      HL, prompt
+    ld      B, 8
+    call    print
 
-cold_start:
-    addr    QUIT
+    call    _WORD
+    ld      A, ':'
+    out     (0), A
+    ld      A, ' '
+    out     (0), A
 
+    NEWLINE
+
+    ld      C, B
+
+    ld      HL, size_prompt
+    ld      B, 6
+    call    print
+
+    ld      A, C
+    add     A, $30      ; This only works for 0-9.
+    out     (0), A
+
+    NEWLINE
+
+    call    _FIND
+    ld      A, H
+    cp      0
+    jp      nz, not_zero
+    ld      A, L
+    cp      0
+    jp      nz, not_zero
+
+is_zero:
+    ld      A, '?'
+    out     (0), A
+    out     (0), A
+    jp      done
+
+not_zero:
+    ld      A, H
+    out     (0), A
+    ld      A, L
+    out     (0), A
+
+done:
+    ld      A, $0d
+    out     (0), A
+    ld      A, $0a
+    out     (0), A
+    jp      loop
+
+prompt:
+    text    "ZFORTH> "
+size_prompt:
+    text    "SIZE: "
+
+print:
+print_loop:
+    ld      A, (HL)
+    out     (0), A
+    inc     HL
+    djnz    print_loop
+    ret
 
 ; DOCOL - "Do Colon"
 ; This is Forth's interpreter.
@@ -217,6 +281,7 @@ not_ready:
     jp      nz, not_ready
 ready:
     in      A, (0)          ; Get the character.
+    out     (0), A          ; Echo it to the user.
     ret
 
     ; EMIT writes a character to the serial line.
@@ -245,7 +310,9 @@ _WORD_skip:
 
     ld      HL, _WORD_buf   ; Load start address of buffer
                             ; into HL.
-    ld      B, 0            ; Initialize B, which will hold the size.
+    ld      B, 1            ; Initialize B, which will hold the size.
+                            ; We initialize to 1 because we've already consumed
+                            ; one character of the word.
 
 _WORD_get:
     call    _KEY
@@ -441,6 +508,4 @@ LATEST:
 ; Start of RAM.
 
     org     $8000
-    section RAM, "u"
 _WORD_buf:
-    spc     256
