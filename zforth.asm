@@ -99,45 +99,11 @@ loop:
     ld      A, ' '
     out     (0), A
 
-    NEWLINE
-
-    ld      C, B
-
-    ld      HL, size_prompt
-    ld      B, 6
-    call    print
-
-    ld      A, C
-    add     A, $30      ; This only works for 0-9.
-    out     (0), A
-
-    NEWLINE
-
     call    _FIND
-    ld      A, H
-    cp      0
-    jp      nz, not_zero
-    ld      A, L
-    cp      0
-    jp      nz, not_zero
+    call    print_hex
 
-is_zero:
-    ld      A, '?'
-    out     (0), A
-    out     (0), A
-    jp      done
+    NEWLINE
 
-not_zero:
-    ld      A, H
-    out     (0), A
-    ld      A, L
-    out     (0), A
-
-done:
-    ld      A, $0d
-    out     (0), A
-    ld      A, $0a
-    out     (0), A
     jp      loop
 
 prompt:
@@ -151,6 +117,59 @@ print_loop:
     out     (0), A
     inc     HL
     djnz    print_loop
+    ret
+
+; Subroutine to print an address in hexadecimal format.
+; Expects the address to print in HL.
+print_hex:
+    ; Print top half of H.
+    ld      A, H
+    srl     A
+    srl     A
+    srl     A
+    srl     A
+
+    call    print_hex_single
+
+    ; Print bottom half of H.
+    ld      A, H
+    and     A, $0f
+
+    call    print_hex_single
+
+    ; Print top half of L.
+    ld      A, L
+    srl     A
+    srl     A
+    srl     A
+    srl     A
+
+    call    print_hex_single
+
+    ; Print bottom half of L.
+    ld      A, L
+    and     A, $0f
+
+    call    print_hex_single
+
+    ret
+
+; Prints a single hexadecimal digit.
+; Expects the value to print to be in A.
+; Behaviour is undefined if the digit is above 15.
+print_hex_single:
+    ; Is the value <= 9?
+    cp      10
+    jp      m, print_hex_single_digit
+
+    ; We didn't branch, so it's between 10 and 15.
+    add     $37
+    out     (0), A
+    ret
+
+print_hex_single_digit:
+    add     A, $30
+    out     (0), A
     ret
 
 ; DOCOL - "Do Colon"
