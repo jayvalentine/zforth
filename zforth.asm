@@ -329,6 +329,10 @@ _WORD_skip:
 
     ld      HL, _WORD_buf   ; Load start address of buffer
                             ; into HL.
+    
+    ld      (HL), A         ; Store first character in the buffer.
+    inc     HL
+
     ld      B, 1            ; Initialize B, which will hold the size.
                             ; We initialize to 1 because we've already consumed
                             ; one character of the word.
@@ -415,6 +419,12 @@ _FIND:
     ld      IY, (LATEST)    ; Load address of latest entry in dictionary.
 
 _FIND_loop:
+    push    IY
+    pop     HL
+
+    pop     BC
+    push    BC
+
     ld      A, (IY+2)       ; Size is 2 bytes into the entry.
     cp      B               ; Compare this size to the one given in B.
 
@@ -422,11 +432,10 @@ _FIND_loop:
     jp      _FIND_next      ; Otherwise skip onto the next one.
 
 _FIND_test:
-    pop     BC              ; Restore B and save it again.
-    push    BC
-
-    pop     HL              ; Restore HL and save it again.
+    pop     BC              ; Restore B and HL and save them again.
+    pop     HL
     push    HL
+    push    BC
 
     push    IY
     pop     DE
@@ -438,7 +447,7 @@ _FIND_test_loop:
     ld      C, (HL)         ; Load the character of the test string into D.
     cp      C               ; Compare.
 
-    jp      nz, _FIND_not_found
+    jp      nz, _FIND_next
 
     inc     DE
     inc     HL
@@ -449,7 +458,6 @@ _FIND_test_loop:
     ; and found them to be the same.
     ; This means we've found the word!
 _FIND_found:
-
     ; First restore the stuff on the stack.
     pop     BC
     pop     HL
@@ -458,15 +466,6 @@ _FIND_found:
     ; Move its start address (in IY) into HL and return.
     push    IY
     pop     HL
-    ret
-
-_FIND_not_found:
-    pop     BC
-    pop     HL
-    pop     DE
-
-    ld      H, 0
-    ld      L, 0
     ret
 
 _FIND_next:
@@ -488,6 +487,15 @@ _FIND_not_zero:
     pop     IY
 
     jp      _FIND_loop
+
+_FIND_not_found:
+    pop     BC
+    pop     HL
+    pop     DE
+
+    ld      H, 0
+    ld      L, 0
+    ret
 
     DEFCODE "INTERPRET", 9, INTERPRET
     call    _WORD
