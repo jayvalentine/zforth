@@ -200,6 +200,22 @@ LINK set name_\label
     push    HL
     NEXT
 
+; Memory operations.
+
+    DEFCODE "!", 1, STORE
+    pop     IY              ; TOS is address to store at.
+    pop     HL              ; Next is data to store.
+    ld      (IY), L
+    ld      (IY+1), H
+    NEXT
+
+    DEFCODE "@", 1, FETCH
+    pop     IY
+    ld      L, (IY)
+    ld      H, (IY+1)
+    push    HL
+    NEXT
+
 ; Input/Output.
 
     ; KEY gets a character from the serial line.
@@ -471,6 +487,41 @@ _NUMBER_get_digit_1:
 _NUMBER_get_digit_2:
     ; In range 'A'-'F'. Subtract $37.
     sub     A, $37
+    ret
+
+    DEFCODE "STRING", 6, STRING
+    call    _STRING
+    ld      C, B
+    ld      B, 0
+    push    BC
+    push    HL
+    NEXT
+
+_STRING:
+    ld      HL, $8100
+    ld      B, 0
+_STRING_start:
+    call    _KEY
+    cp      '"'
+    jp      nz, _STRING_start
+
+    ; Now the string has started.
+_STRING_get:
+    call    _KEY
+
+    ; Is this the end of the string?
+    cp      '"'
+    jp      z, _STRING_done
+
+    ; If not, store this character.
+    ld      (HL), A
+    inc     HL
+    inc     B
+
+    jp      _STRING_get
+
+_STRING_done:
+    ld      HL, $8100
     ret
 
 
