@@ -14,13 +14,6 @@
 
 ; These macros are general-purpose.
 
-    macro NEWLINE
-    ld      A, $0d
-    out     (0), A
-    ld      A, $0a
-    out     (0), A
-    endmacro
-
 ; INC2.
 ; Increment twice the given 16-bit register pair.
     macro INC2, regpair
@@ -68,6 +61,22 @@
     jp      (HL)        ; Execute the subroutine!
     endmacro
 
+; DOCOL - "Do Colon"
+; This is Forth's interpreter.
+; Its job is to save the 'old' IP value and set IP
+; to the address of the next codeword to be executed.
+    macro   DOCOL
+    PUSHRSP             ; Push IP onto the stack.
+
+    ld      DE, $18
+    adc     HL, DE      ; HL should contain the start of this DOCOL
+                        ; so adding the size of DOCOL gives the first data word.
+    
+    ld      D, H
+    ld      E, L
+    NEXT                ; Load the address into IP and NEXT!
+    endmacro
+
 ; Reset vector.
     org     $0000
     jp      start
@@ -88,8 +97,11 @@ start:
     ld      SP, $FFFD
     ld      IX, $F000
 
-    ld      DE, QUIT
+    ld      DE, cold_start
     NEXT
+
+cold_start:
+    addr    QUIT
 
 ; Subroutine to print an address in hexadecimal format.
 ; Expects the address to print in HL.
@@ -144,18 +156,6 @@ print_hex_single_digit:
     out     (0), A
     ret
 
-; DOCOL - "Do Colon"
-; This is Forth's interpreter.
-; Its job is to save the 'old' IP value and set IP
-; to the address of the next codeword to be executed.
-DOCOL:
-    PUSHRSP             ; Push IP onto the stack.
-    INC2    HL          ; HL should contain the address of the codeword
-                        ; so incrementing it twice gives the first data word.
-    ld      D, H
-    ld      E, L
-    NEXT                ; Load the address into W and NEXT!
-
 ; Let's set up the dictionary.
 
 ; A dictionary entry looks like this:
@@ -177,7 +177,7 @@ LINK set name_\label
     byte    \length
     text    \name
 \label:
-    addr    DOCOL
+    DOCOL
     endmacro
 
 ; Let's also write a macro to define a word in assembler.
@@ -188,8 +188,6 @@ LINK set name_\label
     byte    \length
     text    \name
 \label:
-    addr    code_\label
-code_\label:
     endmacro
 
 ; Now we can actually define some primitives.
@@ -267,11 +265,11 @@ code_\label:
 ; Simple subroutine to get a key from the serial line, returned in A.
 _KEY:
     ; Wait for ready.
-not_ready:
+_KEY_not_ready:
     in      A, (1)          ; Polling loop until we can read a character.
     cp      1
-    jp      nz, not_ready
-ready:
+    jp      nz, _KEY_not_ready
+    
     in      A, (0)          ; Get the character.
     out     (0), A          ; Echo it to the user.
     ret
@@ -300,15 +298,44 @@ _PRINT_loop:
 _PRINT_done:
     NEXT
 
+    DEFCODE "NEWLINE", 7, NEWLINE
+    ld      A, $0d
+    out     (0), A
+    ld      A, $0a
+    out     (0), A
+    NEXT
+
+    DEFCODE "DUMPSTACK", 9, DUMPSTACK
+    ld      ($8800), SP
+    ld      IY, ($8800)
+
+    ld      L, (IY)
+    ld      H, (IY+1)
+
+    call    print_hex
+
+    ld      L, (IY+2)
+    ld      H, (IY+3)
+
+    call    print_hex
+
+    ld      L, (IY+4)
+    ld      H, (IY+5)
+
+    call    print_hex
+
+    NEXT
+
     ; WORD gets a space-delimited word from the input stream.
     DEFCODE "WORD", 4, WORD
     call    _WORD           ; Call the WORD subroutine.
                             ; HL will hold the base address, and B the size.
 
-    push    HL              ; Push base address.
     ld      C, B            ; Push size in lower half of BC.
     ld      B, 0
     push    BC
+
+    push    HL              ; Push base address.
     NEXT
 
 _WORD:
@@ -503,7 +530,8 @@ _FIND_found:
     ; just increment the SP.
     ;
     ; Move the codeword into HL.
-    INC2    SP
+    pop     HL
+
     ld      H, D
     ld      L, E
 
@@ -579,7 +607,13 @@ _FIND_not_found:
     NEXT
 
     DEFCODE "INTERPRET", 9, INTERPRET
-    call    _WORD
+    ; Pop string address and size 
+    pop     HL
+    pop     BC
+    ld      B, C
+
+    ; Save HL because it will be overwritten by FIND.
+    push    HL
 
     call    _FIND
 
@@ -590,12 +624,18 @@ _FIND_not_found:
     jp      nz, _INTERPRET_number
 
 _INTERPRET_found:
-    ld      D, H
-    ld      E, L
-    NEXT
+    ; We can discard the saved value of HL.
+    INC2    SP
+
+    ; Execute the found word!
+    jp      (HL)
 
 _INTERPRET_number:
+    ; Restore HL.
+    pop     HL
+
     call    _NUMBER
+
     push    HL
     NEXT
 
@@ -610,8 +650,12 @@ _INTERPRET_number:
     addr    WORD
     addr    INTERPRET
 
+    addr    NEWLINE
+
+    addr    DUMPSTACK
+
     addr    BRANCH
-    addr    -16
+    addr    -18
 
 LATEST:
     addr    LINK
