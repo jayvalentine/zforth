@@ -88,56 +88,8 @@ start:
     ld      SP, $FFFD
     ld      IX, $F000
 
-loop:
-    ld      HL, prompt
-    ld      B, 8
-    call    print
-
-    call    _WORD
-
-    push    HL
-
-    ld      A, ':'
-    out     (0), A
-    ld      A, ' '
-    out     (0), A
-
-    call    _FIND
-
-    ; If the value returned from FIND is zero,
-    ; then the word given is not in the dictionary.
-
-    ld      A, H
-    cp      0
-    jp      nz, found
-    ld      A, L
-    cp      0,
-    jp      nz, found
-
-    pop     HL
-
-    call    _NUMBER
-
-found:
-    call    print_hex
-    NEWLINE
-
-    jp      loop
-
-prompt:
-    text    "ZFORTH> "
-number_prompt:
-    text    "NUMBER: "
-word_prompt:
-    text    "WORD:   "
-
-print:
-print_loop:
-    ld      A, (HL)
-    out     (0), A
-    inc     HL
-    djnz    print_loop
-    ret
+    ld      DE, QUIT
+    NEXT
 
 ; Subroutine to print an address in hexadecimal format.
 ; Expects the address to print in HL.
@@ -225,6 +177,7 @@ LINK set name_\label
     byte    \length
     text    \name
 \label:
+    addr    DOCOL
     endmacro
 
 ; Let's also write a macro to define a word in assembler.
@@ -328,6 +281,23 @@ ready:
     pop     HL
     ld      A, L
     out     (0), A
+    NEXT
+
+    ; PRINT writes a string to the serial line.
+    ; The TOS is the address of the string to write,
+    ; and NOS is the size.
+    DEFCODE "PRINT", 5, PRINT
+    pop     HL
+    pop     BC
+    ld      B, C
+
+_PRINT_loop:
+    ld      A, (HL)
+    out     (0), A
+    inc     HL
+    djnz    _PRINT_loop
+
+_PRINT_done:
     NEXT
 
     ; WORD gets a space-delimited word from the input stream.
@@ -570,6 +540,21 @@ _FIND_not_found:
     ld      L, 0
     ret
 
+    DEFCODE "LIT", 3, LIT
+    ; At this point DE points to the literal to be pushed.
+    push    DE
+    pop     IY
+
+    ld      L, (IY)
+    ld      H, (IY+1)
+
+    push    HL
+
+    ; Skip over the literal so we don't execute it!
+    INC2    DE
+
+    NEXT
+
     DEFCODE "BRANCH", 6, BRANCH
     ; At this point DE points 2 ahead of the codeword
     ; of BRANCH, handily to the branch offset.
@@ -615,11 +600,24 @@ _INTERPRET_number:
     NEXT
 
     DEFWORD "QUIT", 4, QUIT
+    addr    LIT
+    addr    8
+    addr    LIT
+    addr    str_ZFORTH_prompt
+
+    addr    PRINT
+
+    addr    WORD
     addr    INTERPRET
-    addr    EMIT
+
+    addr    BRANCH
+    addr    -16
 
 LATEST:
-    addr   LINK
+    addr    LINK
+
+str_ZFORTH_prompt:
+    text    "ZFORTH> "
 
 ; Start of RAM.
 
