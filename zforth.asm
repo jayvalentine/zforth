@@ -102,6 +102,7 @@ start:
 
 cold_start:
     addr    QUIT
+    addr    GOODBYE
 
 ; Let's set up the dictionary.
 
@@ -617,6 +618,10 @@ _FIND_not_found:
     ; Execute next word, now that we've updated DE.
     NEXT
 
+    DEFCODE "EXIT", 4, EXIT
+    POPRSP
+    NEXT
+
     DEFCODE "INTERPRET", 9, INTERPRET
     ; Pop string address and size 
     pop     HL
@@ -651,6 +656,20 @@ _INTERPRET_found:
     ; Execute the found word!
     jp      (HL)
 
+    DEFCODE "END", 3, END
+    halt
+
+    DEFWORD "GOODBYE", 7, GOODBYE
+    addr    LIT
+    addr    8
+    addr    LIT
+    addr    str_GOODBYE
+
+    addr    PRINT
+    addr    NEWLINE
+
+    addr    END
+
     DEFWORD "QUIT", 4, QUIT
     ; Size and address of the prompt string.
     addr    LIT
@@ -678,6 +697,8 @@ LATEST:
 
 str_ZFORTH_prompt:
     text    "ZFORTH> "
+str_GOODBYE:
+    text    "GOODBYE!"
 
 ; Start of RAM.
 
