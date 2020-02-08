@@ -94,22 +94,42 @@ loop:
     call    print
 
     call    _WORD
+
+    push    HL
+
     ld      A, ':'
     out     (0), A
     ld      A, ' '
     out     (0), A
 
     call    _FIND
-    call    print_hex
 
+    ; If the value returned from FIND is zero,
+    ; then the word given is not in the dictionary.
+
+    ld      A, H
+    cp      0
+    jp      nz, found
+    ld      A, L
+    cp      0,
+    jp      nz, found
+
+    pop     HL
+
+    call    _NUMBER
+
+found:
+    call    print_hex
     NEWLINE
 
     jp      loop
 
 prompt:
     text    "ZFORTH> "
-size_prompt:
-    text    "SIZE: "
+number_prompt:
+    text    "NUMBER: "
+word_prompt:
+    text    "WORD:   "
 
 print:
 print_loop:
@@ -364,40 +384,86 @@ _WORD_done:
     NEXT
 
 _NUMBER:
-    ld      C, 0            ; C will eventually hold
-                            ; our number.
+    push    DE              ; Save DE so we don't trash it.
+    ld      D, 0            ; Initialize to 0.
+    ld      E, 0
+
+    ; Make sure that B is not greater than 4.
+    ld      A, B
+    cp      5
+    jp      m, _NUMBER_size_ok
+    ld      B, 4
+
+    jp      _NUMBER_loop_start
+
+_NUMBER_size_ok:
 _NUMBER_loop:
-    push    AF              ; Save A because we're going to use it.
-    ld      A, C
+    ; We've read in a character, so we want to shift
+    ; DE left four times to make space for the next character.
+    ; Unfortunately the Z80 has no 16-bit shift so we have to implement
+    ; it ourselves!
 
-    ; Multiply A by 10. On the first time round this will do nothing.
-    ; First multiply by 8 with three left-shifts.
+    ld      A, D
+
+    ; Do the shift four times.
+    repeat  4
+
+    ; Shift A left.
     sla     A
-    sla     A
-    sla     A
-    ; Now add C twice.
-    add     A, C
-    add     A, C
 
-    ld      C, A            ; Move back into C.
-    pop     AF              ; and pop A.
+    ; Shift E left. Top bit will be in carry flag.
+    sla     E
 
-    ld      A, (HL)         ; Load a digit.
-    sub     A, $30          ; Subtracting 30 gives the number iff
-                            ; it's actually in the range 0-9.
-                            ; Weird shit happens if not.
+    ; Add carry flag to A.
+    adc     A, 0
 
-    add     A, C            ; Add C and move the new value back into C.
-    ld      C, A
+    endrepeat
 
-    inc     HL              ; Move to next character.
+    ld      D, A
 
-    djnz    _NUMBER_loop    ; Loop if not read all.
+_NUMBER_loop_start
+    ; Read in a character and convert into a number in the range
+    ; 0-15.
+    ld      A, (HL)
+    inc     HL
+    call    _NUMBER_get_digit
 
-    ld      L, C            ; Move our value into HL.
-    ld      H, 0
+    ; OR with E. Move result back into E.
+    or      A, E
+    ld      E, A
 
+    djnz    _NUMBER_loop    ; Repeat if we've not read all the characters.
+
+    ; At this point our number should be in DE.
+    ; Move it into HL and restore DE.
+    ld      H, D
+    ld      L, E
+
+    pop     DE
     ret
+
+    ; Given a hexadecimal digit in A,
+    ; return its value in A.
+_NUMBER_get_digit:
+    cp      $3a
+    jp      m, _NUMBER_get_digit_1
+    cp      $47
+    jp      m, _NUMBER_get_digit_2
+
+    ; In range 'a'-'f'. Subtract $57.
+    sub     A, $57
+    ret
+
+_NUMBER_get_digit_1:
+    ; In range '0'-'9'. Subtract $30.
+    sub     A, $30
+    ret
+
+_NUMBER_get_digit_2:
+    ; In range 'A'-'F'. Subtract $37.
+    sub     A, $37
+    ret
+
 
     DEFCODE "FIND", 4, FIND
     pop     BC              ; Size
@@ -504,23 +570,23 @@ _FIND_not_found:
 
     ld      A, L
     cp      H
-    jp      nz, number
+    jp      nz, _INTERPRET_number
     cp      0
-    jp      nz, number
+    jp      nz, _INTERPRET_number
 
-found:
+_INTERPRET_found:
     INC2    HL
     ld      B, (HL)
 
-skip_name:
+_INTERPRET_skip_name:
     inc     HL
-    djnz    skip_name
+    djnz    _INTERPRET_skip_name
 
     ld      D, H
     ld      E, L
     NEXT
 
-number:
+_INTERPRET_number:
     call    _NUMBER
     push    HL
     NEXT
