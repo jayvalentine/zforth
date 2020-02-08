@@ -314,15 +314,30 @@ _PRINT_done:
 
     call    print_hex
 
+    ld      A, $0d
+    out     (0), A
+    ld      A, $0a
+    out     (0), A
+
     ld      L, (IY+2)
     ld      H, (IY+3)
 
     call    print_hex
 
+    ld      A, $0d
+    out     (0), A
+    ld      A, $0a
+    out     (0), A
+
     ld      L, (IY+4)
     ld      H, (IY+5)
 
     call    print_hex
+
+    ld      A, $0d
+    out     (0), A
+    ld      A, $0a
+    out     (0), A
 
     NEXT
 
@@ -618,17 +633,11 @@ _FIND_not_found:
     call    _FIND
 
     ld      A, L
-    cp      H
-    jp      nz, _INTERPRET_number
     cp      0
-    jp      nz, _INTERPRET_number
-
-_INTERPRET_found:
-    ; We can discard the saved value of HL.
-    INC2    SP
-
-    ; Execute the found word!
-    jp      (HL)
+    jp      nz, _INTERPRET_found
+    ld      A, H
+    cp      0
+    jp      nz, _INTERPRET_found
 
 _INTERPRET_number:
     ; Restore HL.
@@ -638,6 +647,13 @@ _INTERPRET_number:
 
     push    HL
     NEXT
+
+_INTERPRET_found:
+    ; We can discard the saved value of HL.
+    INC2    SP
+
+    ; Execute the found word!
+    jp      (HL)
 
     DEFWORD "QUIT", 4, QUIT
     addr    LIT
