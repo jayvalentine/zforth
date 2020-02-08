@@ -523,15 +523,22 @@ _FIND_test_loop:
     ; If we get here then we've tested each character of the name
     ; and found them to be the same.
     ; This means we've found the word!
+    ;
+    ; At this point DE should point to the codeword.
 _FIND_found:
     ; First restore the stuff on the stack.
     pop     BC
-    pop     HL
-    pop     DE
 
-    ; Move its start address (in IY) into HL and return.
-    push    IY
-    pop     HL
+    ; We don't want to actually restore HL,
+    ; just increment the SP.
+    ;
+    ; Move the codeword into HL.
+    INC2    SP
+    ld      H, D
+    ld      L, E
+
+    pop     DE
+    
     ret
 
 _FIND_next:
@@ -563,6 +570,29 @@ _FIND_not_found:
     ld      L, 0
     ret
 
+    DEFCODE "BRANCH", 6, BRANCH
+    ; At this point DE points 2 ahead of the codeword
+    ; of BRANCH, handily to the branch offset.
+    ;
+    ; Move it into IY so we can load the branch offset.
+    push    DE
+    pop     IY
+
+    ld      L, (IY)
+    ld      H, (IY+1)
+
+    ; Decrement DE twice because it previously pointed
+    ; two bytes ahead of the BRANCH.
+    DEC2    DE
+
+    ; Now add the offset.
+    adc     HL, DE
+    ld      D, H
+    ld      E, L
+
+    ; Execute next word, now that we've updated DE.
+    NEXT
+
     DEFCODE "INTERPRET", 9, INTERPRET
     call    _WORD
 
@@ -575,13 +605,6 @@ _FIND_not_found:
     jp      nz, _INTERPRET_number
 
 _INTERPRET_found:
-    INC2    HL
-    ld      B, (HL)
-
-_INTERPRET_skip_name:
-    inc     HL
-    djnz    _INTERPRET_skip_name
-
     ld      D, H
     ld      E, L
     NEXT
