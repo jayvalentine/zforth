@@ -103,59 +103,6 @@ start:
 cold_start:
     addr    QUIT
 
-; Subroutine to print an address in hexadecimal format.
-; Expects the address to print in HL.
-print_hex:
-    ; Print top half of H.
-    ld      A, H
-    srl     A
-    srl     A
-    srl     A
-    srl     A
-
-    call    print_hex_single
-
-    ; Print bottom half of H.
-    ld      A, H
-    and     A, $0f
-
-    call    print_hex_single
-
-    ; Print top half of L.
-    ld      A, L
-    srl     A
-    srl     A
-    srl     A
-    srl     A
-
-    call    print_hex_single
-
-    ; Print bottom half of L.
-    ld      A, L
-    and     A, $0f
-
-    call    print_hex_single
-
-    ret
-
-; Prints a single hexadecimal digit.
-; Expects the value to print to be in A.
-; Behaviour is undefined if the digit is above 15.
-print_hex_single:
-    ; Is the value <= 9?
-    cp      10
-    jp      m, print_hex_single_digit
-
-    ; We didn't branch, so it's between 10 and 15.
-    add     $37
-    out     (0), A
-    ret
-
-print_hex_single_digit:
-    add     A, $30
-    out     (0), A
-    ret
-
 ; Let's set up the dictionary.
 
 ; A dictionary entry looks like this:
@@ -281,6 +228,63 @@ _KEY_not_ready:
     out     (0), A
     NEXT
 
+    ; DOT ('.') prints the top of the stack.
+    DEFCODE ".", 1, DOT
+    pop     HL
+    call    _DOT
+    NEXT
+
+_DOT:
+    ; Print top half of H.
+    ld      A, H
+    srl     A
+    srl     A
+    srl     A
+    srl     A
+
+    call    print_hex_single
+
+    ; Print bottom half of H.
+    ld      A, H
+    and     A, $0f
+
+    call    print_hex_single
+
+    ; Print top half of L.
+    ld      A, L
+    srl     A
+    srl     A
+    srl     A
+    srl     A
+
+    call    print_hex_single
+
+    ; Print bottom half of L.
+    ld      A, L
+    and     A, $0f
+
+    call    print_hex_single
+
+    ret
+
+; Prints a single hexadecimal digit.
+; Expects the value to print to be in A.
+; Behaviour is undefined if the digit is above 15.
+print_hex_single:
+    ; Is the value <= 9?
+    cp      10
+    jp      m, print_hex_single_digit
+
+    ; We didn't branch, so it's between 10 and 15.
+    add     $37
+    out     (0), A
+    ret
+
+print_hex_single_digit:
+    add     A, $30
+    out     (0), A
+    ret
+
     ; PRINT writes a string to the serial line.
     ; The TOS is the address of the string to write,
     ; and NOS is the size.
@@ -299,11 +303,15 @@ _PRINT_done:
     NEXT
 
     DEFCODE "NEWLINE", 7, NEWLINE
+    call    _NEWLINE
+    NEXT
+
+_NEWLINE:
     ld      A, $0d
     out     (0), A
     ld      A, $0a
     out     (0), A
-    NEXT
+    ret
 
     DEFCODE "DUMPSTACK", 9, DUMPSTACK
     ld      ($8800), SP
@@ -312,32 +320,20 @@ _PRINT_done:
     ld      L, (IY)
     ld      H, (IY+1)
 
-    call    print_hex
-
-    ld      A, $0d
-    out     (0), A
-    ld      A, $0a
-    out     (0), A
+    call    _DOT
+    call    _NEWLINE
 
     ld      L, (IY+2)
     ld      H, (IY+3)
 
-    call    print_hex
-
-    ld      A, $0d
-    out     (0), A
-    ld      A, $0a
-    out     (0), A
+    call    _DOT
+    call    _NEWLINE
 
     ld      L, (IY+4)
     ld      H, (IY+5)
 
-    call    print_hex
-
-    ld      A, $0d
-    out     (0), A
-    ld      A, $0a
-    out     (0), A
+    call    _DOT
+    call    _NEWLINE
 
     NEXT
 
@@ -656,20 +652,24 @@ _INTERPRET_found:
     jp      (HL)
 
     DEFWORD "QUIT", 4, QUIT
+    ; Size and address of the prompt string.
     addr    LIT
     addr    8
     addr    LIT
     addr    str_ZFORTH_prompt
 
+    ; Print the prompt.
     addr    PRINT
 
+    ; Get a word and interpret it.
     addr    WORD
     addr    INTERPRET
 
+    ; Newline, print the stack.
     addr    NEWLINE
-
     addr    DUMPSTACK
 
+    ; And repeat!
     addr    BRANCH
     addr    -18
 
