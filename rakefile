@@ -15,7 +15,7 @@ task :run => :build do
             address 0x0000
             size    0x8000
             
-            contents from_binary("zforth.bin")
+            contents from_binary("zforth.bin")[0..0x7fff]
         end)
 
         add_memory (Zemu::Config::RAM.new do

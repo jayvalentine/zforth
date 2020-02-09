@@ -97,6 +97,17 @@ start:
     ld      SP, $FFFD
     ld      IX, $F000
 
+    ; Now initialize data in RAM.
+    ; HE points to the load values in ROM,
+    ; while DE points to the runtime location in RAM.
+    ld      HL, DATA_LOAD_START
+    ld      DE, DATA_START
+
+    ; BC is the amount of data to transfer.
+    ld      BC, DATA_SIZE
+
+    ldir
+
     ld      DE, cold_start
     NEXT
 
@@ -331,8 +342,8 @@ _NEWLINE:
     ret
 
     DEFCODE "DUMPSTACK", 9, DUMPSTACK
-    ld      ($8800), SP
-    ld      IY, ($8800)
+    ld      (_mem_SCRATCH), SP
+    ld      IY, (_mem_SCRATCH)
 
     ld      L, (IY)
     ld      H, (IY+1)
@@ -372,7 +383,7 @@ _WORD_skip:
     cp      ' '             ; Is this a space?
     jp      z, _WORD_skip   ; Loop until it's not.
 
-    ld      HL, _WORD_buf   ; Load start address of buffer
+    ld      HL, _mem_WORD   ; Load start address of buffer
                             ; into HL.
     
     ld      (HL), A         ; Store first character in the buffer.
@@ -394,7 +405,7 @@ _WORD_get:
     jp      _WORD_get       ; Repeat.
 
 _WORD_done:
-    ld      HL, _WORD_buf
+    ld      HL, _mem_WORD
     ret
 
     ; NUMBER parses a number out of the given string.
@@ -498,7 +509,7 @@ _NUMBER_get_digit_2:
     NEXT
 
 _STRING:
-    ld      HL, $8100
+    ld      HL, _mem_STRING
     ld      B, 0
 _STRING_start:
     call    _KEY
@@ -521,7 +532,7 @@ _STRING_get:
     jp      _STRING_get
 
 _STRING_done:
-    ld      HL, $8100
+    ld      HL, _mem_STRING
     ret
 
 
@@ -542,7 +553,8 @@ _FIND:
     push    HL              ; Save HL.
     push    BC              ; Save B.
 
-    ld      IY, (LATEST)    ; Load address of latest entry in dictionary.
+    ; Load address of latest entry in dictionary.
+    ld      IY, (var_LATEST)
 
 _FIND_loop:
     push    IY
@@ -743,15 +755,37 @@ _INTERPRET_found:
     addr    BRANCH
     addr    -18
 
-LATEST:
-    addr    LINK
-
+; Start of readonly data.
 str_ZFORTH_prompt:
     text    "ZFORTH> "
 str_GOODBYE:
     text    "GOODBYE!"
 
-; Start of RAM.
+; Start of data initializers.
+DATA_LOAD_START:
 
+load_LATEST:
+    addr    LINK
+
+DATA_LOAD_END:
+
+DATA_SIZE set DATA_LOAD_END - DATA_LOAD_START
+
+
+
+; Start of RAM.
     org     $8000
-_WORD_buf:
+
+; Initialized data.
+DATA_START:
+
+var_LATEST:
+    blk     2
+
+; Uninitialized data.
+_mem_WORD:
+    blk     256
+_mem_SCRATCH:
+    blk     256
+_mem_STRING:
+    blk     256
