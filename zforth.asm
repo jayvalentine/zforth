@@ -239,14 +239,67 @@ LINK set name_\label
 
 ; Simple subroutine to get a key from the serial line, returned in A.
 _KEY:
+    push    HL
+    push    BC
+
+    ld      HL, (var_KEY_HEAD)
+    ld      BC, (var_KEY_TAIL)
+
+    ; Do we have characters in the buffer?
+    ; If so skip straight to reading them.
+    ld      A, H
+    cp      B
+    jp      nz, _KEY_read_buffer
+    ld      A, L
+    cp      C
+    jp      nz, _KEY_read_buffer
+
+    ; Otherwise we fill the buffer with characters from the serial line
+    ; until we hit a LF.
+
+    ; Reset head and tail.
+    ld      HL, _mem_KEY
+    ld      BC, _mem_KEY
+
     ; Wait for ready.
 _KEY_not_ready:
     in      A, (1)          ; Polling loop until we can read a character.
     cp      1
     jp      nz, _KEY_not_ready
-    
-    in      A, (0)          ; Get the character.
-    out     (0), A          ; Echo it to the user.
+
+    in      A, (0)          ; Read a character.
+    cp      $0d             ; Is this a newline?
+
+    ; If so, we're done.
+    jp      z, _KEY_fill_done
+
+    ; Otherwise store the character in the buffer.
+
+    out     (0), A          ; Echo the character to the user.
+    ld      (BC), A
+    inc     BC              ; Increment the tail pointer.
+
+    jp      _KEY_not_ready
+
+_KEY_fill_done:
+    ld      A, ' '          ; Store a terminating space.
+    out     (0), A
+    ld      (BC), A
+    inc     BC
+
+    ; Store the updated tail pointer.
+    ld      (var_KEY_TAIL), BC
+
+_KEY_read_buffer:
+    ld      A, (HL)         ; Get the character.
+
+    ; Increment the head pointer and store.
+    inc     HL
+    ld      (var_KEY_HEAD), HL
+
+    pop     BC
+    pop     HL
+
     ret
 
     ; EMIT writes a character to the serial line.
@@ -260,6 +313,7 @@ _KEY_not_ready:
     DEFCODE ".", 1, DOT
     pop     HL
     call    _DOT
+    call    _NEWLINE
     NEXT
 
 _DOT:
@@ -320,7 +374,10 @@ print_hex_single_digit:
     pop     HL
     pop     BC
     ld      B, C
+    call    _PRINT
+    NEXT
 
+_PRINT:
 _PRINT_loop:
     ld      A, (HL)
     out     (0), A
@@ -328,7 +385,7 @@ _PRINT_loop:
     djnz    _PRINT_loop
 
 _PRINT_done:
-    NEXT
+    ret
 
     DEFCODE "NEWLINE", 7, NEWLINE
     call    _NEWLINE
@@ -734,26 +791,13 @@ _INTERPRET_found:
     addr    END
 
     DEFWORD "QUIT", 4, QUIT
-    ; Size and address of the prompt string.
-    addr    LIT
-    addr    8
-    addr    LIT
-    addr    str_ZFORTH_prompt
-
-    ; Print the prompt.
-    addr    PRINT
-
     ; Get a word and interpret it.
     addr    WORD
     addr    INTERPRET
 
-    ; Newline, print the stack.
-    addr    NEWLINE
-    addr    DUMPSTACK
-
     ; And repeat!
     addr    BRANCH
-    addr    -18
+    addr    -4
 
 ; Start of readonly data.
 str_ZFORTH_prompt:
@@ -766,6 +810,10 @@ DATA_LOAD_START:
 
 load_LATEST:
     addr    LINK
+load_KEY_HEAD:
+    addr    _mem_KEY
+load_KEY_TAIL:
+    addr    _mem_KEY
 
 DATA_LOAD_END:
 
@@ -781,8 +829,15 @@ DATA_START:
 
 var_LATEST:
     blk     2
+var_KEY_HEAD:
+    blk     2
+var_KEY_TAIL:
+    blk     2
 
 ; Uninitialized data.
+_mem_KEY:
+    blk     256
+_mem_KEY_END:
 _mem_WORD:
     blk     256
 _mem_SCRATCH:
