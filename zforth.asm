@@ -61,22 +61,6 @@
     jp      (HL)        ; Execute the subroutine!
     endmacro
 
-; DOCOL - "Do Colon"
-; This is Forth's interpreter.
-; Its job is to save the 'old' IP value and set IP
-; to the address of the next codeword to be executed.
-    macro   DOCOL
-    PUSHRSP             ; Push IP onto the stack.
-
-    ld      DE, $18
-    adc     HL, DE      ; HL should contain the start of this DOCOL
-                        ; so adding the size of DOCOL gives the first data word.
-    
-    ld      D, H
-    ld      E, L
-    NEXT                ; Load the address into IP and NEXT!
-    endmacro
-
 ; Reset vector.
     org     $0000
     jp      start
@@ -115,6 +99,24 @@ cold_start:
     addr    QUIT
     addr    GOODBYE
 
+; DOCOL - "Do Colon"
+; This is Forth's interpreter.
+; Its job is to save the 'old' IP value and set IP
+; to the address of the next codeword to be executed.
+DOCOL:
+    PUSHRSP             ; Push IP onto the stack.
+
+    ; At this point, if DOCOL has been called (and not just jumped to)
+    ; the return address will be on the stack.
+    ; Handily, this return address is also the address of the first
+    ; parameter word of the colon definition! How neat!
+    ;
+    ; So, to set IP to the address of the first parameter word, we can
+    ; just pop DE off the stack!
+    pop     DE
+
+    NEXT                ; Execute the first word of this definition!
+
 ; Let's set up the dictionary.
 
 ; A dictionary entry looks like this:
@@ -136,7 +138,7 @@ LINK set name_\label
     byte    \length
     text    \name
 \label:
-    DOCOL
+    call    DOCOL
     endmacro
 
 ; Let's also write a macro to define a word in assembler.
