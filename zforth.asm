@@ -259,6 +259,10 @@ _KEY:
     ; Otherwise we fill the buffer with characters from the serial line
     ; until we hit a LF.
 
+    ld      HL, str_ZFORTH_prompt
+    ld      B, 8
+    call    _PRINT
+
     ; Reset head and tail.
     ld      HL, _mem_KEY
     ld      BC, _mem_KEY
