@@ -293,6 +293,8 @@ _KEY_fill_done:
     ld      (BC), A
     inc     BC
 
+    call    _NEWLINE
+
     ; Store the updated tail pointer.
     ld      (var_KEY_TAIL), BC
 
@@ -323,6 +325,10 @@ _KEY_read_buffer:
     NEXT
 
 _DOT:
+    ; Print a '$', indicating that this is a hexadecimal number.
+    ld      A, '$'
+    out     (0), A
+
     ; Print top half of H.
     ld      A, H
     srl     A
@@ -393,7 +399,7 @@ _PRINT_loop:
 _PRINT_done:
     ret
 
-    DEFCODE "NEWLINE", 7, NEWLINE
+    DEFCODE "CR", 2, CR
     call    _NEWLINE
     NEXT
 
@@ -792,7 +798,7 @@ _INTERPRET_found:
     addr    str_GOODBYE
 
     addr    PRINT
-    addr    NEWLINE
+    addr    CR
 
     addr    END
 
