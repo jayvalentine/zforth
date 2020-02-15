@@ -933,11 +933,16 @@ _INTERPRET_found:
     INC2    SP
 
     ; Get the size of the word.
-    ; The top bit of the size tells us if this is immediate
-    ; or not.
     INC2    HL
-    ld      B, (HL)
-    ld      A, B
+    ld      A, (HL)
+    ld      C, A
+
+    ; Mask out the immediate flag.
+    ; If we don't do this then the size will be wrong.
+    and     A, $7f
+
+    ; Load size into B.
+    ld      B, A
 
 _INTERPRET_skip_name:
     inc     HL
@@ -945,11 +950,9 @@ _INTERPRET_skip_name:
 
     inc     HL
 
-    ; At this point HL holds the address of the codeword.
-
     ; If the top bit of A is set, always execute this word,
     ; because it's immediate.
-    bit     0, A
+    bit     7, C
     jp      nz, _INTERPRET_found_execute
 
     ; Figure out if we're in COMPILE or INTERPRET
