@@ -151,6 +151,15 @@ LINK set name_\label
 \label:
     endmacro
 
+    macro   DEFIMMED, name, length, label
+name_\label:
+    addr    LINK
+LINK set name_\label
+    byte    $80 | \length
+    text    \name
+\label:
+    endmacro
+
 ; Now we can actually define some primitives.
 ; These are some simple ones, defined in assembler.
 
@@ -661,9 +670,6 @@ _STRING_done:
     ; Restore the old value of HL, which points to HERE.
     pop     DE
 
-    push    HL
-    push    BC
-
     ; Store the size.
     ld      A, B
     ld      (DE), A
@@ -672,34 +678,59 @@ _STRING_done:
     ; At this point, DE points to the location
     ; of the first character of the name, and HL
     ; points to the WORD buffer. B holds the size.
-    ; Zero C and we can use a block transfer instruction.
+    ; Zero B and we can use a block transfer instruction.
     ld      C, B
     ld      B, 0
     ldir
 
     ; Now DE points to the codeword.
-    ; For now just give a dummy codeword.
-    ld      HL, _COLON_DUMMY
-    ld      C, 19
+    ld      HL, _COLON_CODE
+    ld      C, _COLON_CODE_END - _COLON_CODE
     ldir
 
     ld      (var_HERE), DE
-
-    pop     BC
-    pop     HL
-    call    _PRINT
 
     pop     DE
 
     NEXT
 
-_COLON_DUMMY:
-    ld      A, '!'
-    out     (0), A
-    out     (0), A
-    out     (0), A
-    ld      A, ' '
-    out     (0), A
+_COLON_CODE:
+    call    DOCOL
+_COLON_CODE_END:
+
+    DEFCODE ",", 1, COMMA
+    pop     BC
+    call    _COMMA
+    NEXT
+
+_COMMA:
+    ; Load HERE into HL.
+    ld      HL, (var_HERE)
+    ld      (HL), C
+    inc     HL
+    ld      (HL), B
+    inc     HL
+    ld      (var_HERE), HL
+    ret
+
+    DEFIMMED ";", 1, ENDCOLON
+    ; Append EXIT onto the currently-defining word.
+    ld      BC, EXIT
+    call    _COMMA
+
+    ; Move back into INTERPRET mode.
+    ld      HL, var_STATE
+    res     0, (HL)
+
+    ld      HL, str_DEFINED
+    ld      B, 9
+    call    _PRINT
+
+    ld      HL, (var_LATEST)
+    INC2    HL
+    ld      B, (HL)
+    inc     HL
+    call    _PRINT
     NEXT
 
     DEFCODE "FIND", 4, FIND
@@ -730,6 +761,8 @@ _FIND_loop:
     push    BC
 
     ld      A, (IY+2)       ; Size is 2 bytes into the entry.
+    and     A, $7f          ; Mask out the immediate flag, otherwise the comparison
+                            ; will fail.
     cp      B               ; Compare this size to the one given in B.
 
     jp      z, _FIND_test   ; If they're equal, we've potentially found something.
@@ -770,11 +803,10 @@ _FIND_found:
     ; We don't want to actually restore HL,
     ; just increment the SP.
     ;
-    ; Move the codeword into HL.
+    ; Move the address of this word (in IY) into HL.
+    INC2    SP
+    push    IY
     pop     HL
-
-    ld      H, D
-    ld      L, E
 
     pop     DE
     
@@ -900,6 +932,41 @@ _INTERPRET_found:
     ; We can discard the saved value of HL.
     INC2    SP
 
+    ; Get the size of the word.
+    ; The top bit of the size tells us if this is immediate
+    ; or not.
+    INC2    HL
+    ld      B, (HL)
+    ld      A, B
+
+_INTERPRET_skip_name:
+    inc     HL
+    djnz    _INTERPRET_skip_name
+
+    inc     HL
+
+    ; At this point HL holds the address of the codeword.
+
+    ; If the top bit of A is set, always execute this word,
+    ; because it's immediate.
+    bit     0, A
+    jp      nz, _INTERPRET_found_execute
+
+    ; Figure out if we're in COMPILE or INTERPRET
+    ; mode. If compile then bit 0 of STATE
+    ; will be set.
+    ld      A, (var_STATE)
+    bit     0, A
+    jp      z, _INTERPRET_found_execute
+
+    ; We're compiling, so move the word into BC
+    ; and call COMMA.
+    ld      B, H
+    ld      C, L
+    call    _COMMA
+    NEXT
+
+_INTERPRET_found_execute:
     ; Execute the found word!
     jp      (HL)
 
@@ -931,6 +998,8 @@ str_ZFORTH_prompt:
     text    "ZFORTH> "
 str_GOODBYE:
     text    "GOODBYE!"
+str_DEFINED:
+    text    "DEFINED: "
 
 ; Start of data initializers.
 DATA_LOAD_START:
