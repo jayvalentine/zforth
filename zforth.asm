@@ -533,6 +533,16 @@ _NUMBER_loop_start
     inc     HL
     call    _NUMBER_get_digit
 
+    cp      $ff
+    jp      nz, _NUMBER_valid
+
+    pop     DE
+
+    ld      A, $ff
+    ret
+
+_NUMBER_valid
+
     ; OR with E. Move result back into E.
     or      A, E
     ld      E, A
@@ -545,6 +555,8 @@ _NUMBER_loop_start
     ld      L, E
 
     pop     DE
+
+    ld      A, $00
     ret
 
     ; Given a hexadecimal digit in A,
@@ -788,6 +800,7 @@ _INTERPRET_number:
 
     call    _NUMBER
 
+_INTERPRET_number_valid:
     push    HL
     NEXT
 
