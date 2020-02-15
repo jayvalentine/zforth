@@ -488,7 +488,9 @@ _WORD_done:
     NEXT
 
 _NUMBER:
-    push    DE              ; Save DE so we don't trash it.
+    push    DE              ; Save DE, BC so we don't trash them.
+    push    BC
+
     ld      D, 0            ; Initialize to 0.
     ld      E, 0
 
@@ -535,6 +537,7 @@ _NUMBER_loop_start
     cp      $ff
     jp      nz, _NUMBER_valid
 
+    pop     BC
     pop     DE
 
     ld      A, $ff
@@ -553,6 +556,7 @@ _NUMBER_valid
     ld      H, D
     ld      L, E
 
+    pop     BC
     pop     DE
 
     ld      A, $00
