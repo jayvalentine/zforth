@@ -555,18 +555,28 @@ _NUMBER_get_digit:
     cp      $47
     jp      m, _NUMBER_get_digit_2
 
+    cp      $61
+    jp      m, _NUMBER_get_digit_invalid
     ; In range 'a'-'f'. Subtract $57.
     sub     A, $57
     ret
 
 _NUMBER_get_digit_1:
+    cp      $30
+    jp      m, _NUMBER_get_digit_invalid
     ; In range '0'-'9'. Subtract $30.
     sub     A, $30
     ret
 
 _NUMBER_get_digit_2:
+    cp      $41
+    jp      m, _NUMBER_get_digit_invalid
     ; In range 'A'-'F'. Subtract $37.
     sub     A, $37
+    ret
+
+_NUMBER_get_digit_invalid:
+    ld      A, $ff
     ret
 
     DEFCODE "STRING", 6, STRING
