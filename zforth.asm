@@ -673,24 +673,34 @@ _STRING_done:
     ; of the first character of the name, and HL
     ; points to the WORD buffer. B holds the size.
     ; Zero C and we can use a block transfer instruction.
-    ld      C, 0
+    ld      C, B
+    ld      B, 0
     ldir
 
     ; Now DE points to the codeword.
     ; For now just give a dummy codeword.
     ld      HL, _COLON_DUMMY
-    ld      B, 4
+    ld      C, 19
     ldir
+
+    ld      (var_HERE), DE
 
     pop     BC
     pop     HL
     call    _PRINT
 
+    pop     DE
+
     NEXT
 
 _COLON_DUMMY:
-    ld      A, '?'
+    ld      A, '!'
     out     (0), A
+    out     (0), A
+    out     (0), A
+    ld      A, ' '
+    out     (0), A
+    NEXT
 
     DEFCODE "FIND", 4, FIND
     pop     BC              ; Size
