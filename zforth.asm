@@ -259,6 +259,8 @@ _KEY:
     ; Otherwise we fill the buffer with characters from the serial line
     ; until we hit a LF.
 
+    call    _NEWLINE
+
     ld      HL, str_ZFORTH_prompt
     ld      B, 8
     call    _PRINT
@@ -293,8 +295,6 @@ _KEY_fill_done:
     ld      (BC), A
     inc     BC
 
-    call    _NEWLINE
-
     ; Store the updated tail pointer.
     ld      (var_KEY_TAIL), BC
 
@@ -321,7 +321,6 @@ _KEY_read_buffer:
     DEFCODE ".", 1, DOT
     pop     HL
     call    _DOT
-    call    _NEWLINE
     NEXT
 
 _DOT:
@@ -797,17 +796,27 @@ _FIND_not_found:
 _INTERPRET_number:
     ; Restore HL.
     pop     HL
+    push    HL
 
     call    _NUMBER
 
     cp      $00
     jp      z, _INTERPRET_number_valid
 
+    ; NUMBER has returned an error code, so this isn't
+    ; a number but an undefined word.
     ld      A, '?'
+    out     (0), A
+
+    pop     HL
+    call    _PRINT
+
+    ld      A, ' '
     out     (0), A
     NEXT
 
 _INTERPRET_number_valid:
+    INC2    SP
     push    HL
     NEXT
 
