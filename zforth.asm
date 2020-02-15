@@ -800,6 +800,13 @@ _INTERPRET_number:
 
     call    _NUMBER
 
+    cp      $00
+    jp      z, _INTERPRET_number_valid
+
+    ld      A, '?'
+    out     (0), A
+    NEXT
+
 _INTERPRET_number_valid:
     push    HL
     NEXT
