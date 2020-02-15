@@ -629,6 +629,68 @@ _STRING_done:
     ld      HL, _mem_STRING
     ret
 
+; These are compilation-related words.
+    DEFCODE ":", 1, COLON
+    ; Put the interpreter into COMPILE mode.
+    ld      HL, var_STATE
+    set     0, (HL)
+
+    ; Save DE because we're going to use it.
+    push    DE
+
+    ; Set up the dictionary link pointer.
+    ld      HL, (var_HERE)
+    ld      DE, (var_LATEST)
+
+    ; Save the new link pointer.
+    ld      (var_LATEST), HL
+
+    ; Store the old link pointer in the first two bytes
+    ; of this new word.
+    ld      (HL), E
+    inc     HL
+    ld      (HL), D
+    inc     HL
+
+    ; Save HL because it'll be trashed by WORD.
+    push    HL
+
+    ; Get the word name and size.
+    call    _WORD
+
+    ; Restore the old value of HL, which points to HERE.
+    pop     DE
+
+    push    HL
+    push    BC
+
+    ; Store the size.
+    ld      A, B
+    ld      (DE), A
+    inc     DE
+
+    ; At this point, DE points to the location
+    ; of the first character of the name, and HL
+    ; points to the WORD buffer. B holds the size.
+    ; Zero C and we can use a block transfer instruction.
+    ld      C, 0
+    ldir
+
+    ; Now DE points to the codeword.
+    ; For now just give a dummy codeword.
+    ld      HL, _COLON_DUMMY
+    ld      B, 4
+    ldir
+
+    pop     BC
+    pop     HL
+    call    _PRINT
+
+    NEXT
+
+_COLON_DUMMY:
+    ld      A, '?'
+    out     (0), A
 
     DEFCODE "FIND", 4, FIND
     pop     BC              ; Size
@@ -869,6 +931,10 @@ load_KEY_HEAD:
     addr    _mem_KEY
 load_KEY_TAIL:
     addr    _mem_KEY
+load_STATE:
+    byte    $00
+load_HERE:
+    addr    FREE_START
 
 DATA_LOAD_END:
 
@@ -888,6 +954,10 @@ var_KEY_HEAD:
     blk     2
 var_KEY_TAIL:
     blk     2
+var_STATE:
+    blk     1
+var_HERE:
+    blk     2
 
 ; Uninitialized data.
 _mem_KEY:
@@ -899,3 +969,5 @@ _mem_SCRATCH:
     blk     256
 _mem_STRING:
     blk     256
+
+FREE_START:
