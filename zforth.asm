@@ -955,6 +955,85 @@ _FIND_not_found:
     ; Execute next word, now that we've updated DE.
     NEXT
 
+    ; BRANCH0 takes a branch if the TOS is == 0.
+    DEFCODE "BRANCH0", 7, BRANCH0
+    ; Get the top of the stack. If 1 then we're
+    ; going to take this branch.
+    pop     BC
+
+    ; Little hack, but just compare the lower half of BC.
+    ld      A, C
+    cp      $00
+    jp      z, BRANCH_take_branch
+
+    ; We're not taking the branch, so increment DE again and jump.
+    INC2    DE
+    NEXT
+
+BRANCH_take_branch:
+    push    DE
+    pop     IY
+
+    ld      L, (IY)
+    ld      H, (IY+1)
+
+    ; Dec DE so that it points to this branch.
+    ; Then add the offset.
+    DEC2    DE
+    adc     HL, DE
+    ld      D, H
+    ld      E, L
+
+    ; Execute the word now that we've changed DE.
+    NEXT
+
+    ; IF can be combined with THEN to allow for conditional
+    ; execution in defined words.
+    DEFIMMED "IF", 2, IF
+    ; push HERE to the stack. HERE will point to the location
+    ; of the location to which the offset is relative.
+    ld      HL, (var_HERE)
+    push    HL
+
+    ; Compile a BRANCH1.
+    ld      BC, BRANCH0
+    call    _COMMA
+
+    ; push HERE to the stack. HERE will point to the location
+    ; of the branch offset that needs to be fixed up.
+    ld      HL, (var_HERE)
+    push    HL
+
+    ; Compile a dummy offset. This will need to be updated by THEN.
+    ld      BC, $ffff
+    call    _COMMA
+    NEXT
+
+    ; THEN terminates an IF. It fetches the address of the branch offset
+    ; and fixes it up to point to this HERE.
+    DEFIMMED "THEN", 4, THEN
+    ; Load the location of the offset to be fixed up.
+    pop     HL
+
+    ; Load the location of the branch. We need to calculate the offset
+    ; relative to this.
+    pop     BC
+
+    push    HL
+
+    ; Load HERE.
+    ld      HL, (var_HERE)
+
+    ; Subtract the branch location from HERE, to give the offset.
+    ; After this operation the offset will be in BC.
+    sbc     HL, BC
+
+    pop     IY
+    ld      (IY), L
+    ld      (IY+1), H
+
+    NEXT
+
     DEFCODE "EXIT", 4, EXIT
     POPRSP
     NEXT
@@ -1017,7 +1096,7 @@ _INTERPRET_number_valid:
 
     pop     BC
     call    _COMMA
-    
+
     NEXT
 
 _INTERPRET_number_push:
