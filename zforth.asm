@@ -222,6 +222,82 @@ LINK set name_\label
     push    HL
     NEXT
 
+; Comparisons.
+    ; Compares TOS to NOS, returns TRUE iff TOS < NOS.
+    DEFCODE "<", 1, LESS
+    pop     HL
+    pop     BC
+
+    ; Compare top half.
+    ld      A, H
+    cp      B
+    jp      m, LESS_true
+
+    ; Otherwise compare bottom half.
+    ld      A, L
+    cp      C
+    jp      m, LESS_true
+
+    ; Not less-than, so push 0 to stack.
+    ld      HL, 0
+
+    jp      LESS_done
+
+LESS_true:
+    ld      HL, 1
+
+LESS_done:
+    push    HL
+    NEXT
+
+    DEFCODE "=", 1, EQ
+    pop     HL
+    pop     BC
+
+    ; Compare top half.
+    ld      A, H
+    cp      B
+    jp      nz, EQ_false
+
+    ; Compare bottom half.
+    ld      A, L
+    cp      C
+    jp      nz, EQ_false
+
+    ; Operands are equal.
+    ld      HL, 1
+    jp      EQ_done
+
+EQ_false:
+    ld      HL, 0
+
+EQ_done:
+    push    HL
+    NEXT
+
+    DEFCODE "0=", 2, EQ0
+    pop     HL
+
+    ; First compare H and L. If they aren't equal
+    ; then this obviously can't be 0.
+    ld      A, H
+    cp      L
+    jp      nz, EQ0_false
+
+    ; Now compare H to 0.
+    cp      0
+    jp      nz, EQ0_false
+
+    ld      HL, 1
+    jp      EQ0_done
+
+EQ0_false:
+    ld      HL, 0
+
+EQ0_done:
+    push    HL
+    NEXT
+
 ; Memory operations.
 
     DEFCODE "!", 1, STORE
