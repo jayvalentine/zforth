@@ -1001,6 +1001,26 @@ _INTERPRET_number:
 
 _INTERPRET_number_valid:
     INC2    SP
+
+    ; Figure out if we're in COMPILE or INTERPRET
+    ; mode. If compile then bit 0 of STATE
+    ; will be set.
+    ld      A, (var_STATE)
+    bit     0, A
+    jp      z, _INTERPRET_number_push
+
+    ; We're in compile mode, so compile LIT followed by this number.
+    push    HL
+
+    ld      BC, LIT
+    call    _COMMA
+
+    pop     BC
+    call    _COMMA
+    
+    NEXT
+
+_INTERPRET_number_push:
     push    HL
     NEXT
 
