@@ -442,6 +442,21 @@ _KEY_not_ready:
     cp      $7f             ; Is this a backspace (DELETE)?
     jp      nz, _KEY_store
 
+    ; If we're already at the start of the buffer then we can't
+    ; go back any further.
+    ;
+    ; Luckily for us, at this point HL holds the start of the
+    ; buffer, so we can use that for comparison.
+    ld      A, B
+    cp      H
+    jp      nz, _KEY_not_at_start
+
+    ; At this point we've checked the top half and found them to be equal.
+    ld      A, C
+    cp      L
+    jp      z, _KEY_not_ready
+
+_KEY_not_at_start:
     call    _KEY_ANSI_backspace
 
     ; Emit a space to cover up what was in this space before.
