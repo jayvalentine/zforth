@@ -222,6 +222,26 @@ LINK set name_\label
     push    HL
     NEXT
 
+    DEFCODE "AND", 3, AND
+    ; Load top two items from stack.
+    pop     HL
+    pop     BC
+    
+    ; AND top half.
+    ld      A, H
+    and     B
+    ld      H, A
+
+    ; AND bottom half.
+    ld      A, L
+    and     C
+    ld      L, A
+
+    ; Push result to stack.
+    push    HL
+    NEXT
+
+
 ; Comparisons.
     ; Compares TOS to NOS, returns TRUE iff TOS < NOS.
     DEFCODE "<", 1, LESS
@@ -303,40 +323,52 @@ EQ0_done:
     ld      HL, (var_RAND)
     push    HL
 
-    ld      A, 0
+    ld      A, H
+    rra
 
-    ; Shift H left. The top bit will be in the
-    ; carry flag.
-    sla     H
+    ld      A, L
+    rra
 
-    ; Move carry into C.
-    adc     A, 0
-    ld      C, A
+    xor     H
 
-    ; Shift L left.
-    sla     L
-
-    ; Move carry into B.
-    adc     A, 0
-    ld      B, A
-
-    ; Move carry flag into lowest position of H.
-    or      H
     ld      H, A
+    ld      A, L
+    rra
 
-    ; XOR carries from the shifts of H and L.
-    ld      A, B
-    xor     C
+    ld      A, H
+    rra
 
-    ; OR in L, to give the effect of "shifting in"
-    ; the XOR result.
-    or      L
+    xor     L
+
     ld      L, A
+
+    xor     H
+    ld      H, A
 
     ; Now store back into RAND.
     ld      (var_RAND), HL
 
+    scf
+    ccf
+
     NEXT
+
+    ; CHOOSE selects one of the two items on the top of the stack,
+    ; at random.
+    DEFWORD "CHOOSE", 6, CHOOSE
+    addr    RAND            ; Generate a random number.
+
+    addr    LIT             ; Which half is the random number in?
+    addr    $7FFF
+    addr    LESS
+
+    addr    BRANCH0         ; Either swap or don't swap, depending on
+    addr    4               ; the value in the lowest bit of RAND.
+                            ; This should have a uniform distribution.
+    addr    SWAP
+
+    addr    DROP
+    addr    EXIT
 
 ; Memory operations.
 
@@ -989,6 +1021,7 @@ _FIND_not_found:
 
     ; Now add the offset.
     adc     HL, DE
+
     ld      D, H
     ld      E, L
 
