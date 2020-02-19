@@ -359,8 +359,8 @@ EQ0_done:
     addr    RAND            ; Generate a random number.
 
     addr    LIT             ; Which half is the random number in?
-    addr    $7FFF
-    addr    LESS
+    addr    $0001
+    addr    AND
 
     addr    BRANCH0         ; Either swap or don't swap, depending on
     addr    CHOOSE_skip     ; the value in the lowest bit of RAND.
