@@ -298,6 +298,46 @@ EQ0_done:
     push    HL
     NEXT
 
+; Random number generation.
+    DEFCODE "RAND", 4, RAND
+    ld      HL, (var_RAND)
+    push    HL
+
+    ld      A, 0
+
+    ; Shift H left. The top bit will be in the
+    ; carry flag.
+    sla     H
+
+    ; Move carry into C.
+    adc     A, 0
+    ld      C, A
+
+    ; Shift L left.
+    sla     L
+
+    ; Move carry into B.
+    adc     A, 0
+    ld      B, A
+
+    ; Move carry flag into lowest position of H.
+    or      H
+    ld      H, A
+
+    ; XOR carries from the shifts of H and L.
+    ld      A, B
+    xor     C
+
+    ; OR in L, to give the effect of "shifting in"
+    ; the XOR result.
+    or      L
+    ld      L, A
+
+    ; Now store back into RAND.
+    ld      (var_RAND), HL
+
+    NEXT
+
 ; Memory operations.
 
     DEFCODE "!", 1, STORE
@@ -1192,6 +1232,8 @@ load_STATE:
     byte    $00
 load_HERE:
     addr    FREE_START
+load_RAND:
+    addr    DEF_RAND_SEED
 
 DATA_LOAD_END:
 
@@ -1214,6 +1256,8 @@ var_KEY_TAIL:
 var_STATE:
     blk     1
 var_HERE:
+    blk     2
+var_RAND:
     blk     2
 
 ; Uninitialized data.
