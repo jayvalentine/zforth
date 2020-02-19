@@ -439,8 +439,23 @@ _KEY_not_ready:
     ; If so, we're done.
     jp      z, _KEY_fill_done
 
-    ; Otherwise store the character in the buffer.
+    cp      $7f             ; Is this a backspace (DELETE)?
+    jp      nz, _KEY_store
 
+    call    _KEY_ANSI_backspace
+
+    ; Emit a space to cover up what was in this space before.
+    ld      A, $20
+    out     (0), A
+    
+    call    _KEY_ANSI_backspace
+
+    dec     BC
+
+    jp      _KEY_not_ready
+
+    ; Otherwise store the character in the buffer.
+_KEY_store:
     out     (0), A          ; Echo the character to the user.
     ld      (BC), A
     inc     BC              ; Increment the tail pointer.
@@ -465,6 +480,17 @@ _KEY_read_buffer:
 
     pop     BC
     pop     HL
+
+    ret
+
+; Emit the ANSI code to move cursor back.
+_KEY_ANSI_backspace:
+    ld      A, $1b
+    out     (0), A
+    ld      A, $5b
+    out     (0), A
+    ld      A, $44
+    out     (0), A
 
     ret
 
