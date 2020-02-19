@@ -471,6 +471,9 @@ _KEY_not_at_start:
 
     ; Otherwise store the character in the buffer.
 _KEY_store:
+    cp      $1b             ; Don't emit or buffer ESC,
+    jp      z, _KEY_not_ready
+
     out     (0), A          ; Echo the character to the user.
     ld      (BC), A
     inc     BC              ; Increment the tail pointer.
