@@ -363,9 +363,10 @@ EQ0_done:
     addr    LESS
 
     addr    BRANCH0         ; Either swap or don't swap, depending on
-    addr    4               ; the value in the lowest bit of RAND.
+    addr    CHOOSE_skip     ; the value in the lowest bit of RAND.
                             ; This should have a uniform distribution.
     addr    SWAP
+CHOOSE_skip:
 
     addr    DROP
     addr    EXIT
@@ -1006,56 +1007,64 @@ _FIND_not_found:
 
     DEFCODE "BRANCH", 6, BRANCH
     ; At this point DE points 2 ahead of the codeword
-    ; of BRANCH, handily to the branch offset.
+    ; of BRANCH, handily to the branch address.
     ;
-    ; Move it into IY so we can load the branch offset.
+    ; Move it into IY so we can load the branch address.
     push    DE
     pop     IY
 
-    ld      L, (IY)
-    ld      H, (IY+1)
-
-    ; Decrement DE twice because it previously pointed
-    ; two bytes ahead of the BRANCH.
-    DEC2    DE
-
-    ; Now add the offset.
-    adc     HL, DE
-
-    ld      D, H
-    ld      E, L
+    ld      E, (IY)
+    ld      D, (IY+1)
 
     ; Execute next word, now that we've updated DE.
     NEXT
 
     ; BRANCH0 takes a branch if the TOS is == 0.
     DEFCODE "BRANCH0", 7, BRANCH0
-    ; Get the top of the stack. If 1 then we're
+    ; Get the top of the stack. If 0 then we're
     ; going to take this branch.
     pop     BC
 
     ; Little hack, but just compare the lower half of BC.
     ld      A, C
     cp      $00
-    jp      z, BRANCH_take_branch
+    jp      z, BRANCH0_take_branch
 
     ; We're not taking the branch, so increment DE again and jump.
     INC2    DE
     NEXT
 
-BRANCH_take_branch:
+BRANCH0_take_branch:
     push    DE
     pop     IY
 
-    ld      L, (IY)
-    ld      H, (IY+1)
+    ld      E, (IY)
+    ld      D, (IY+1)
 
-    ; Dec DE so that it points to this branch.
-    ; Then add the offset.
-    DEC2    DE
-    adc     HL, DE
-    ld      D, H
-    ld      E, L
+    ; Execute the word now that we've changed DE.
+    NEXT
+
+    ; BRANCH1 takes a branch if the TOS is != 0.
+    DEFCODE "BRANCH1", 7, BRANCH1
+    ; Get the top of the stack. If != 0 then we're
+    ; going to take this branch.
+    pop     BC
+
+    ; Little hack, but just compare the lower half of BC.
+    ld      A, C
+    cp      $00
+    jp      nz, BRANCH1_take_branch
+
+    ; We're not taking the branch, so increment DE again and jump.
+    INC2    DE
+    NEXT
+
+BRANCH1_take_branch:
+    push    DE
+    pop     IY
+
+    ld      E, (IY)
+    ld      D, (IY+1)
 
     ; Execute the word now that we've changed DE.
     NEXT
@@ -1063,12 +1072,7 @@ BRANCH_take_branch:
     ; IF can be combined with THEN to allow for conditional
     ; execution in defined words.
     DEFIMMED "IF", 2, IF
-    ; push HERE to the stack. HERE will point to the location
-    ; of the location to which the offset is relative.
-    ld      HL, (var_HERE)
-    push    HL
-
-    ; Compile a BRANCH1.
+    ; Compile a BRANCH0.
     ld      BC, BRANCH0
     call    _COMMA
 
@@ -1085,25 +1089,32 @@ BRANCH_take_branch:
     ; THEN terminates an IF. It fetches the address of the branch offset
     ; and fixes it up to point to this HERE.
     DEFIMMED "THEN", 4, THEN
-    ; Load the location of the offset to be fixed up.
-    pop     HL
-
-    ; Load the location of the branch. We need to calculate the offset
-    ; relative to this.
-    pop     BC
-
-    push    HL
-
     ; Load HERE.
     ld      HL, (var_HERE)
 
-    ; Subtract the branch location from HERE, to give the offset.
-    ; After this operation the offset will be in BC.
-    sbc     HL, BC
-
+    ; Load the address of the address to be fixed up.
     pop     IY
+
     ld      (IY), L
     ld      (IY+1), H
+
+    NEXT
+
+    ; BEGIN starts a loop construct.
+    DEFIMMED "BEGIN", 5, BEGIN
+    ; Push HERE onto the stack.
+    ld      HL, (var_HERE)
+    push    HL
+    NEXT
+
+    ; WHILE will compile a BRANCH1 to the location
+    ; marked by the most recent BEGIN.
+    DEFIMMED "WHILE", 5, WHILE
+    ld      BC, BRANCH1     ; Compile a BRANCH1.
+    call    _COMMA
+
+    pop     BC              ; Compile the branch offset.
+    call    _COMMA
 
     NEXT
 
@@ -1237,12 +1248,13 @@ _INTERPRET_found_execute:
 
     DEFWORD "QUIT", 4, QUIT
     ; Get a word and interpret it.
+QUIT_loop:
     addr    WORD
     addr    INTERPRET
 
     ; And repeat!
     addr    BRANCH
-    addr    -4
+    addr    QUIT_loop
 
 ; Start of readonly data.
 str_ZFORTH_prompt:
