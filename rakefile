@@ -10,6 +10,8 @@ task :run => :build do
     conf = Zemu::Config.new do
         name "zemu_zforth"
 
+        clock_speed 8_000_000
+
         add_memory (Zemu::Config::ROM.new do
             name "rom"
             address 0x0000
