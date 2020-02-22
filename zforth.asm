@@ -51,12 +51,16 @@
 ; which is pointed to by IP, and jumps to it. It also advances the IP
 ; to the next codeword to be executed.
     macro   NEXT
-    ld      A, (DE)     ; Load next address to be executed.
-    ld      L, A
-    inc     DE
-    ld      A, (DE)
-    ld      H, A
-    inc     DE
+    ex      DE, HL      ; Exchange DE and HL.
+    
+    ld      E, (HL)     ; Load the address of the next word into DE,
+    inc     HL          ; incrementing HL as we go.
+    ld      D, (HL)
+    inc     HL
+
+    ex      DE, HL      ; Exchange back.
+                        ; The codeword to be executed is now in
+                        ; HL, and the address of the next one is in DE.
 
     jp      (HL)        ; Execute the subroutine!
     endmacro
@@ -1036,16 +1040,17 @@ _FIND_not_found:
 
     DEFCODE "LIT", 3, LIT
     ; At this point DE points to the literal to be pushed.
-    push    DE
-    pop     IY
+    ; Move it into HL for faster access.
+    ex      DE, HL
 
-    ld      L, (IY)
-    ld      H, (IY+1)
+    ld      C, (HL)
+    inc     HL
+    ld      B, (HL)
+    inc     HL
 
-    push    HL
+    push    BC
 
-    ; Skip over the literal so we don't execute it!
-    INC2    DE
+    ex      DE, HL
 
     NEXT
 
