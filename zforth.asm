@@ -656,6 +656,8 @@ _WORD_skip:
     call    _KEY
     cp      ' '             ; Is this a space?
     jp      z, _WORD_skip   ; Loop until it's not.
+    cp      $0a
+    jp      z, _WORD_skip
 
     ld      HL, _mem_WORD   ; Load start address of buffer
                             ; into HL.
@@ -671,6 +673,8 @@ _WORD_get:
     call    _KEY
     cp      ' '             ; Is this a space?
     jp      z, _WORD_done   ; If so, we're done.
+    cp      $0a
+    jp      z, _WORD_done
 
     ld      (HL), A         ; If not, store the character
     inc     HL              ; and move onto the next location.
@@ -1381,15 +1385,20 @@ str_GOODBYE:
 str_DEFINED:
     text    "DEFINED: "
 
+; Start of included standard library, in ASCII form.
+file_ZFORTH:
+    incbin  "zforth.zf"
+file_ZFORTH_END:
+
 ; Start of data initializers.
 DATA_LOAD_START:
 
 load_LATEST:
     addr    LINK
 load_KEY_HEAD:
-    addr    _mem_KEY
+    addr    file_ZFORTH
 load_KEY_TAIL:
-    addr    _mem_KEY
+    addr    file_ZFORTH_END
 load_STATE:
     byte    $00
 load_HERE:
