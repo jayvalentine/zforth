@@ -684,8 +684,8 @@ _WORD_done:
 
     ; NUMBER parses a number out of the given string.
     DEFCODE "NUMBER", 6, NUMBER
-    pop     BC              ; Size.
     pop     HL              ; Base address of string.
+    pop     BC              ; Size.
     ld      B, C
 
     call    _NUMBER
@@ -800,8 +800,48 @@ _NUMBER_get_digit_invalid:
     ld      A, $ff
     ret
 
-    DEFCODE "STRING", 6, STRING
+    ; STRING allows the user to create a string.
+    ; If interpreting, it places the string onto the stack.
+    ; If compiling, it compiles a special word, LITSTRING, followed
+    ; by the string into the definition.
+    DEFIMMED "STRING", 6, STRING
     call    _STRING
+
+    ; Figure out what mode we're in.
+    ld      A, (var_STATE)
+    bit     0, A
+    jp      z, STRING_interpret
+
+STRING_compile:
+    push    DE              ; Save DE because we're going to use it.
+
+    push    HL              ; Save BC and HL because they're
+    push    BC              ; going to get trashed by COMMA.
+    
+    ld      BC, LITSTRING   ; Compile LITSTRING.
+    call    _COMMA
+
+    pop     BC              ; Restore BC. B holds the size of the string.
+    ld      A, B
+
+    ld      DE, (var_HERE)  ; Now compile the size into the definition.
+    ld      (DE), A
+    inc     DE
+
+    pop     HL              ; Restore HL, which holds the address of the
+                            ; string that we read from the user.
+
+    ld      C, A            ; Load the size into BC as a 16-bit byte count,
+    ld      B, 0            ; so we can use LDIR.
+
+    ldir                    ; Copy the string into the definition.
+
+    ld      (var_HERE), DE  ; Save the updated HERE.
+
+    pop     DE              ; Restore DE and finish.
+    NEXT
+
+STRING_interpret:
     ld      C, B
     ld      B, 0
     push    BC
@@ -1052,6 +1092,34 @@ _FIND_not_found:
 
     ex      DE, HL
 
+    NEXT
+
+    ; LITSTRING pushes a literal string, embedded in a definition,
+    ; onto the stack.
+    ; TOS becomes the string address, and NOS becomes the size.
+    DEFCODE "LITSTRING", 9, LITSTRING
+    ex      DE, HL      ; Exchange DE and HL for speed.
+
+    ; At this point HL points to the size.
+    ld      A, (HL)
+    inc     HL
+
+    ld      C, A
+    ld      B, 0
+
+    push    BC
+
+    ; Now that we've loaded the size and incremented DE, it now
+    ; points to the string itself.
+    push    HL
+
+    ; Skip the string.
+    add     HL, BC
+
+    ; Now HL points to the byte after the end of the string.
+    ; This is the location of the next word in this definition.
+    ; Exchange DE/HL and do NEXT.
+    ex      DE, HL
     NEXT
 
     DEFCODE "BRANCH", 6, BRANCH
