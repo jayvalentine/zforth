@@ -12,6 +12,17 @@
 
 ; Some macros.
 
+; System macros.
+
+; Syscall.
+    macro zsys, number
+    ld      A, \number << 1
+    rst     48
+    endmacro
+
+SWRITE set 0
+SREAD set 1
+
 ; These macros are general-purpose.
 
 ; INC2.
@@ -65,36 +76,24 @@
     jp      (HL)        ; Execute the subroutine!
     endmacro
 
-; Reset vector.
-    org     $0000
-    jp      start
-
 ; Program start.
-    org     $0100
+    org     $8000
 start:
-    ; Set up the stacks. SP points to the Parameter Stack,
-    ; which grows down from 0xFFFD.
+    ; Set up the stacks. First we need to save the current stack pointer.
+    ld      (ENV_STACK), SP
+
     ; IX points to the Return Stack, which grows upwards from
-    ; 0xF000.
+    ; 0xE000.
     ;
-    ; This means that we have 4094 bytes available to be shared
-    ; between them.
+    ; SP is the parameter stack, which grows down from 0xEFFF
+    ;
     ; Having one grow up and the other down allows them to share the space
     ; more efficiently - space not used by one stack can be used
     ; by the other.
-    ld      SP, $FFFD
-    ld      IX, $F000
-
-    ; Now initialize data in RAM.
-    ; HE points to the load values in ROM,
-    ; while DE points to the runtime location in RAM.
-    ld      HL, DATA_LOAD_START
-    ld      DE, DATA_START
-
-    ; BC is the amount of data to transfer.
-    ld      BC, DATA_SIZE
-
-    ldir
+    ld      SP, $EFFF
+    ld      IX, $E000
+    
+    ; No data initialization required - this will have been loaded by the bootloader/OS.
 
     ld      DE, cold_start
     NEXT
@@ -433,11 +432,8 @@ _KEY:
 
     ; Wait for ready.
 _KEY_not_ready:
-    in      A, (1)          ; Polling loop until we can read a character.
-    cp      1
-    jp      nz, _KEY_not_ready
+    zsys    SREAD           ; Read from serial port.
 
-    in      A, (0)          ; Read a character.
     cp      $0d             ; Is this a newline?
 
     ; If so, we're done.
@@ -464,8 +460,10 @@ _KEY_not_at_start:
     call    _KEY_ANSI_backspace
 
     ; Emit a space to cover up what was in this space before.
-    ld      A, $20
-    out     (0), A
+    push    HL
+    ld      L, $20
+    zsys    SWRITE
+    pop     HL
     
     call    _KEY_ANSI_backspace
 
@@ -478,7 +476,12 @@ _KEY_store:
     cp      $1b             ; Don't emit or buffer ESC,
     jp      z, _KEY_not_ready
 
-    out     (0), A          ; Echo the character to the user.
+    push    HL
+    ld      (BC), A
+    ld      L, A
+    zsys    SWRITE
+    pop     HL
+
     ld      (BC), A
     inc     BC              ; Increment the tail pointer.
 
@@ -486,8 +489,13 @@ _KEY_store:
 
 _KEY_fill_done:
     ld      A, ' '          ; Store a terminating space.
-    out     (0), A
     ld      (BC), A
+
+    push    HL
+    ld      L, A
+    zsys    SWRITE
+    pop     HL
+
     inc     BC
 
     ; Store the updated tail pointer.
@@ -507,20 +515,21 @@ _KEY_read_buffer:
 
 ; Emit the ANSI code to move cursor back.
 _KEY_ANSI_backspace:
-    ld      A, $1b
-    out     (0), A
-    ld      A, $5b
-    out     (0), A
-    ld      A, $44
-    out     (0), A
+    push    HL
+    ld      L, $1b
+    zsys    SWRITE
+    ld      L, $5b
+    zsys    SWRITE
+    ld      L, $44
+    zsys    SWRITE
+    pop     HL
 
     ret
 
     ; EMIT writes a character to the serial line.
     DEFCODE "EMIT", 4, EMIT
     pop     HL
-    ld      A, L
-    out     (0), A
+    zsys    SWRITE
     NEXT
 
     ; DOT ('.') prints the top of the stack.
@@ -531,8 +540,10 @@ _KEY_ANSI_backspace:
 
 _DOT:
     ; Print a '$', indicating that this is a hexadecimal number.
-    ld      A, '$'
-    out     (0), A
+    push    HL
+    ld      L, '$'
+    zsys    SWRITE
+    pop     HL
 
     ; Print top half of H.
     ld      A, H
@@ -576,12 +587,22 @@ print_hex_single:
 
     ; We didn't branch, so it's between 10 and 15.
     add     $37
-    out     (0), A
+    
+    push    HL
+    ld      L, A
+    zsys    SWRITE
+    pop     HL
+
     ret
 
 print_hex_single_digit:
     add     A, $30
-    out     (0), A
+    
+    push    HL
+    ld      L, A
+    zsys    SWRITE
+    pop     HL
+
     ret
 
     ; PRINT writes a string to the serial line.
@@ -597,7 +618,12 @@ print_hex_single_digit:
 _PRINT:
 _PRINT_loop:
     ld      A, (HL)
-    out     (0), A
+
+    push    HL
+    ld      L, A
+    zsys    SWRITE
+    pop     HL
+
     inc     HL
     djnz    _PRINT_loop
 
@@ -609,10 +635,12 @@ _PRINT_done:
     NEXT
 
 _NEWLINE:
-    ld      A, $0d
-    out     (0), A
-    ld      A, $0a
-    out     (0), A
+    push    HL
+    ld      L, $0d
+    zsys    SWRITE
+    ld      L, $0a
+    zsys    SWRITE
+    pop     HL
     ret
 
     DEFCODE "DUMPSTACK", 9, DUMPSTACK
@@ -1273,14 +1301,19 @@ _INTERPRET_number:
 
     ; NUMBER has returned an error code, so this isn't
     ; a number but an undefined word.
-    ld      A, '?'
-    out     (0), A
+    push    HL
+    ld      L, '?'
+    zsys    SWRITE
+    pop     HL
 
     pop     HL
     call    _PRINT
 
-    ld      A, ' '
-    out     (0), A
+    push    HL
+    ld      L, ' '
+    zsys    SWRITE
+    pop     HL
+    
     NEXT
 
 _INTERPRET_number_valid:
@@ -1353,8 +1386,14 @@ _INTERPRET_found_execute:
     ; Execute the found word!
     jp      (HL)
 
+    ; Exit ZFORTH.
     DEFCODE "END", 3, END
-    halt
+    ; Restore environment's stack pointer.
+    ld      SP, (ENV_STACK)
+
+    ; Return. Assumes that a return address is on the stack.
+    ; I.e. that the ZFORTH entry point has been called like a subroutine.
+    ret
 
     DEFWORD "GOODBYE", 7, GOODBYE
     addr    LIT
@@ -1385,51 +1424,22 @@ str_GOODBYE:
 str_DEFINED:
     text    "DEFINED: "
 
-; Start of included standard library, in ASCII form.
-file_ZFORTH:
-    incbin  "zforth.zf"
-file_ZFORTH_END:
+ENV_STACK:
+    blk     2
 
-; Start of data initializers.
-DATA_LOAD_START:
-
-load_LATEST:
-    addr    LINK
-load_KEY_HEAD:
-    addr    file_ZFORTH
-load_KEY_TAIL:
-    addr    file_ZFORTH_END
-load_STATE:
-    byte    $00
-load_HERE:
-    addr    FREE_START
-load_RAND:
-    addr    DEF_RAND_SEED
-
-DATA_LOAD_END:
-
-DATA_SIZE set DATA_LOAD_END - DATA_LOAD_START
-
-
-
-; Start of RAM.
-    org     $8000
-
-; Initialized data.
-DATA_START:
-
+; Initialized variables.
 var_LATEST:
-    blk     2
+    addr    LINK
 var_KEY_HEAD:
-    blk     2
+    addr    _mem_KEY
 var_KEY_TAIL:
-    blk     2
+    addr    _mem_KEY
 var_STATE:
-    blk     1
+    byte    $00
 var_HERE:
-    blk     2
+    addr    FREE_START
 var_RAND:
-    blk     2
+    addr    DEF_RAND_SEED
 
 ; Uninitialized data.
 _mem_KEY:
