@@ -2,8 +2,8 @@ require 'zemu'
 
 desc "Build the application."
 task :build do
-    system "vasmz80_oldstyle -DDEF_RAND_SEED=#{rand(0xFFFF)} -Fbin zforth.asm -o zforth.bin"
-    system "z80dasm -lat -g0 zforth.bin > zforth.diss"
+    system "vasmz80_oldstyle -DDEF_RAND_SEED=#{rand(0xFFFF)} -Fsrec zforth.asm -o zforth.srec"
+    system "objcopy -I srec -O ihex zforth.srec zforth.hex"
 end
 
 task :run => :build do
