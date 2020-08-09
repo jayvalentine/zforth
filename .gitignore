@@ -1,5 +1,7 @@
 # Compiled binary.
 *.bin
+*.srec
+*.hex
 
 # Disassembled files.
 *.diss
