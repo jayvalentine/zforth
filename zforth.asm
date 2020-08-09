@@ -439,8 +439,14 @@ _KEY_not_ready:
     ; If so, we're done.
     jp      z, _KEY_fill_done
 
-    cp      $7f             ; Is this a backspace (DELETE)?
-    jp      nz, _KEY_store
+    cp      $7f             ; Is this a backspace or delete?
+    jp      z, _KEY_backsp  ; Check both because some terminal emulators
+    cp      $08             ; seem to use one, and others use the other.
+    jp      z, _KEY_backsp
+
+    jp      _KEY_store
+
+_KEY_backsp:
 
     ; If we're already at the start of the buffer then we can't
     ; go back any further.
