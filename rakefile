@@ -1,41 +1,8 @@
-require 'zemu'
+require 'rake/clean'
+
+CLEAN.include("*.bin", "*.hex", "*.lst", "*.map", "*.srec")
 
 desc "Build the application."
 task :build do
-    system "vasmz80_oldstyle -esc -DDEF_RAND_SEED=#{rand(0xFFFF)} -L zforth.lst -Fsrec zforth.asm -o zforth.srec"
-
-    system "objcopy -I srec -O ihex zforth.srec zforth.hex"
-end
-
-task :run => :build do
-    conf = Zemu::Config.new do
-        name "zemu_zforth"
-
-        clock_speed 8_000_000
-
-        add_memory (Zemu::Config::ROM.new do
-            name "rom"
-            address 0x0000
-            size    0x8000
-            
-            contents from_binary("zforth.bin")[0..0x7fff]
-        end)
-
-        add_memory (Zemu::Config::RAM.new do
-            name "ram"
-            address 0x8000
-            size    0x7FFF
-        end)
-
-        add_io (Zemu::Config::SerialPort.new do
-            name "serial"
-            in_port 0x00
-            out_port 0x00
-            ready_port 0x01
-        end)
-    end
-
-    puts "Starting emulator..."
-
-    Zemu.start_interactive(conf)
+    system "vasmz80_oldstyle -esc -DDEF_RAND_SEED=#{rand(0xFFFF)} -L zforth.lst -Fbin zforth.asm -o zforth.bin"
 end
