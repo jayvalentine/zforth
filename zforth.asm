@@ -488,7 +488,6 @@ _KEY_store:
     zsys    SWRITE
     pop     HL
 
-    ld      (BC), A
     inc     BC              ; Increment the tail pointer.
 
     jp      _KEY_not_ready
