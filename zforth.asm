@@ -79,6 +79,8 @@ SREAD set 1
 ; Program start.
     org     $8000
 start:
+    ; Save the position of the stack pointer on entry so we can reset it when we exit.
+    ld      (_system_stack), SP
 
     ; IX points to the Return Stack, which grows upwards from
     ; 0xE000.
@@ -92,6 +94,11 @@ start:
     ld      IX, $E000
     
     ; No data initialization required - this will have been loaded by the bootloader/OS.
+
+    ; To make things neater, move the cursor up by one.
+    ld      HL, str_up_by_one
+    ld      B, 3
+    call    _PRINT
 
     ld      DE, cold_start
     NEXT
@@ -417,9 +424,7 @@ _KEY:
 
     ; Otherwise we fill the buffer with characters from the serial line
     ; until we hit a LF.
-
     call    _NEWLINE
-
     ld      HL, str_ZFORTH_prompt
     ld      B, 8
     call    _PRINT
@@ -1391,6 +1396,8 @@ _INTERPRET_found_execute:
 
     ; Exit ZFORTH.
     DEFCODE "END", 3, END
+    ; Restore system stack pointer.
+    ld      SP, (_system_stack)
 
     ; Return. Assumes that a return address is on the stack.
     ; I.e. that the ZFORTH entry point has been called like a subroutine.
@@ -1424,6 +1431,12 @@ str_GOODBYE:
     text    "GOODBYE!"
 str_DEFINED:
     text    "DEFINED: "
+str_up_by_one:
+    byte    $1b
+    text    "[A"
+
+_system_stack:
+    blk     2
 
 ; Initialized variables.
 var_LATEST:
