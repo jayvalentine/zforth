@@ -79,18 +79,16 @@ SREAD set 1
 ; Program start.
     org     $8000
 start:
-    ; Set up the stacks. First we need to save the current stack pointer.
-    ld      (ENV_STACK), SP
 
     ; IX points to the Return Stack, which grows upwards from
     ; 0xE000.
     ;
-    ; SP is the parameter stack, which grows down from 0xEFFF
+    ; SP is the parameter stack, which grows downwards and has already been set up for us
+    ; by the system.
     ;
     ; Having one grow up and the other down allows them to share the space
     ; more efficiently - space not used by one stack can be used
     ; by the other.
-    ld      SP, $EFFF
     ld      IX, $E000
     
     ; No data initialization required - this will have been loaded by the bootloader/OS.
@@ -1393,8 +1391,6 @@ _INTERPRET_found_execute:
 
     ; Exit ZFORTH.
     DEFCODE "END", 3, END
-    ; Restore environment's stack pointer.
-    ld      SP, (ENV_STACK)
 
     ; Return. Assumes that a return address is on the stack.
     ; I.e. that the ZFORTH entry point has been called like a subroutine.
@@ -1428,9 +1424,6 @@ str_GOODBYE:
     text    "GOODBYE!"
 str_DEFINED:
     text    "DEFINED: "
-
-ENV_STACK:
-    blk     2
 
 ; Initialized variables.
 var_LATEST:
