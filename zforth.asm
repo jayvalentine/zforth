@@ -100,6 +100,10 @@ start:
     ld      B, 3
     call    _PRINT
 
+    ; Return value, assuming it's not explicitly given.
+    ld      HL, 0
+    push    HL
+
     ld      DE, cold_start
     NEXT
 
@@ -1396,6 +1400,9 @@ _INTERPRET_found_execute:
 
     ; Exit ZFORTH.
     DEFCODE "END", 3, END
+    ; Return value is TOS.
+    pop     HL
+    
     ; Restore system stack pointer.
     ld      SP, (_system_stack)
 
