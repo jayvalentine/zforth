@@ -5,4 +5,5 @@ CLEAN.include("*.bin", "*.hex", "*.lst", "*.map", "*.srec")
 desc "Build the application."
 task :build do
     system "vasmz80_oldstyle -esc -DDEF_RAND_SEED=#{rand(0xFFFF)} -L zforth.lst -Fbin zforth.asm -o zforth.bin"
+    system "appmake +hex -b zforth.bin --org 0x8000 -o zforth.hex"
 end
